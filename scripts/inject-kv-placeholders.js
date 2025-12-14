@@ -8,6 +8,10 @@ const replacements = [
   { placeholder: 'placeholder_staging_id', envVar: 'KV_NAMESPACE_ID_STAGING', label: 'staging' }
 ];
 
+if (!fs.existsSync(CONFIG_PATH)) {
+  throw new Error(`wrangler.toml not found at ${CONFIG_PATH}`);
+}
+
 const original = fs.readFileSync(CONFIG_PATH, 'utf8');
 let updated = original;
 const missing = [];
@@ -24,7 +28,7 @@ for (const { placeholder, envVar, label } of replacements) {
     continue;
   }
 
-  updated = updated.replace(placeholder, value);
+  updated = updated.replaceAll(placeholder, value);
 }
 
 if (missing.length) {
