@@ -1,0 +1,76 @@
+# Cloudflare Workers configuration for Entangled Links
+name = "entangled-links"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+
+# Worker settings
+workers_dev = true
+route = ""
+zone_id = ""
+
+# KV Namespaces for storing entanglement state
+# Run: wrangler kv:namespace create "LINKS" to generate ID
+kv_namespaces = [
+  { binding = "LINKS", id = "placeholder_will_be_generated" }
+]
+
+# Build configuration
+[build]
+command = ""
+
+# Development settings
+[dev]
+port = 8787
+local_protocol = "http"
+
+# Observability
+[observability]
+enabled = true
+
+# Production environment
+[env.production]
+name = "entangled-links-prod"
+vars = { ENVIRONMENT = "production" }
+
+# Production KV namespace
+# Run: wrangler kv:namespace create "LINKS" --env production
+kv_namespaces = [
+  { binding = "LINKS", id = "placeholder_production_id" }
+]
+
+# Staging environment
+[env.staging]
+name = "entangled-links-staging"
+vars = { ENVIRONMENT = "staging" }
+
+# Staging KV namespace
+# Run: wrangler kv:namespace create "LINKS" --env staging
+kv_namespaces = [
+  { binding = "LINKS", id = "placeholder_staging_id" }
+]
+
+# Development/Preview environment
+[env.preview]
+name = "entangled-links-preview"
+vars = { ENVIRONMENT = "preview" }
+
+# Rate limiting and security settings can be configured via vars
+# These are accessible via env.ENVIRONMENT in your code
+
+# Limits
+# Note: These are Worker limits, actual limits are in code
+limits = { cpu_ms = 50 }
+
+# Optional: Custom domain routing (configure after deployment)
+# [[routes]]
+# pattern = "links.yourdomain.com/*"
+# zone_name = "yourdomain.com"
+
+# Optional: Durable Objects (for future features like real-time updates)
+# [[durable_objects.bindings]]
+# name = "ENTANGLEMENT_STATE"
+# class_name = "EntanglementState"
+
+# Optional: Analytics Engine (for privacy-respecting analytics)
+# [analytics_engine_datasets]
+# binding = "ANALYTICS"

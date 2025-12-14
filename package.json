@@ -1,0 +1,27 @@
+{
+  "name": "entangled-links",
+  "version": "0.1.0",
+  "description": "Cryptographically entangled URL shortener",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest",
+    "cf-typegen": "wrangler types"
+  },
+  "keywords": [
+    "url-shortener",
+    "cryptography",
+    "cloudflare-workers",
+    "entanglement"
+  ],
+  "author": "Clancy @ NUAA",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "vitest": "^1.0.0",
+    "wrangler": "^3.80.0"
+  },
+  "dependencies": {}
+}
