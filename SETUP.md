@@ -199,6 +199,11 @@ wrangler deploy
    - Add the following secrets:
      - `CLOUDFLARE_API_TOKEN`: Your API token
      - `CLOUDFLARE_ACCOUNT_ID`: Your account ID
+     - `KV_NAMESPACE_ID_DEV`: KV namespace ID for development
+     - `KV_NAMESPACE_ID_STAGING`: KV namespace ID for staging
+     - `KV_NAMESPACE_ID_PROD`: KV namespace ID for production
+
+   The CI deploy jobs will replace the placeholder IDs in `wrangler.toml` using these secrets before running `wrangler deploy`. Staging/production deploys require their matching IDs; the development ID is only needed when deploying the default environment (the CI staging/production jobs do not use it).
 
 2. The workflow automatically:
    - Runs tests on every push/PR
