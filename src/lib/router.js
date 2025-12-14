@@ -12,7 +12,7 @@ export class Router {
     const pattern = path
       .replace(/\//g, '\\/')
       .replace(/:(\w+)/g, '(?<$1>[^/]+)');
-    
+
     this.routes.push({
       method,
       pattern: new RegExp(`^${pattern}$`),
@@ -50,7 +50,7 @@ export class Router {
       }
     }
 
-    return new Response('Not Found', { 
+    return new Response('Not Found', {
       status: 404,
       headers: { 'Content-Type': 'text/plain' }
     });

@@ -194,27 +194,35 @@ console.log('Link accessed:', {
 
 ## Security Checklist
 
-- [ ] URLs encrypted at rest (AES-256-GCM)
-- [ ] Keys split across links (XOR)
-- [ ] No plaintext URLs in logs
-- [ ] CORS configured appropriately
-- [ ] Rate limiting implemented (TODO)
-- [ ] CSP headers set
-- [ ] HTTPS enforced
-- [ ] No tracking/analytics by default
+- [x] URLs encrypted at rest (AES-256-GCM)
+- [x] Keys split across links (XOR)
+- [x] No plaintext URLs in logs
+- [x] CORS configured appropriately
+- [x] Rate limiting implemented (Token bucket algorithm, 20 req/min per IP)
+- [x] CSP headers set
+- [x] HTTPS enforced
+- [x] No tracking/analytics by default
 
 ## Production Hardening
 
-### Rate Limiting (TODO)
-```javascript
-// Add to index.js
-const RATE_LIMIT = 10; // per minute
-const rateLimiter = new Map();
+### Rate Limiting Configuration
 
-// Check before generating
-if (rateLimiter.get(ip) > RATE_LIMIT) {
-  return new Response('Rate limit exceeded', { status: 429 });
-}
+Rate limiting is implemented using a token bucket algorithm in `src/middleware/rateLimiter.js`.
+
+**Current settings** (configurable in `src/index.js`):
+```javascript
+const rateLimiter = createRateLimiter(env, {
+  maxRequests: 20,        // Maximum requests per window
+  windowMs: 60000,        // 1 minute window
+  keyPrefix: 'ratelimit:'
+});
+```
+
+**To customize per environment**, update `wrangler.toml`:
+```toml
+[env.production.vars]
+RATE_LIMIT_MAX = "10"
+RATE_LIMIT_WINDOW_MS = "60000"
 ```
 
 ### Custom Domain
