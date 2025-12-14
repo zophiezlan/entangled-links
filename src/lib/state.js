@@ -17,31 +17,38 @@ export const EntanglementState = {
 
 /**
  * Create initial entangled pair state
+ * @param {string} shortcodeA - Link A shortcode
+ * @param {string} shortcodeB - Link B shortcode
+ * @param {object} encryptedData - Encrypted URL data
+ * @param {string} keyA - Key A
+ * @param {string} keyB - Key B
+ * @param {number} expiresIn - Expiration time in milliseconds (default: 7 days)
  */
-export function createEntangledPair(shortcodeA, shortcodeB, encryptedData, keyA, keyB) {
+export function createEntangledPair(shortcodeA, shortcodeB, encryptedData, keyA, keyB, expiresIn = 7 * 24 * 60 * 60 * 1000) {
   const now = Date.now();
-  
+
   return {
     // Pair metadata
     pairId: crypto.randomUUID(),
     createdAt: now,
-    expiresAt: now + (7 * 24 * 60 * 60 * 1000), // 7 days
-    
+    expiresAt: now + expiresIn,
+    expiresIn: expiresIn, // Store for later use
+
     // Entanglement state
     state: EntanglementState.SUPERPOSITION,
-    
+
     // Link identifiers
     linkA: shortcodeA,
     linkB: shortcodeB,
-    
+
     // Encrypted payload
     encryptedUrl: encryptedData.ciphertext,
     iv: encryptedData.iv,
-    
+
     // Split keys (each link gets one)
     keyA: keyA,
     keyB: keyB,
-    
+
     // Access tracking
     accessLog: []
   };
@@ -51,18 +58,19 @@ export function createEntangledPair(shortcodeA, shortcodeB, encryptedData, keyA,
  * Store entangled pair in KV
  */
 export async function storePair(env, pairData) {
-  const { linkA, linkB, pairId } = pairData;
-  
+  const { linkA, linkB, pairId, expiresIn } = pairData;
+  const ttlSeconds = Math.floor(expiresIn / 1000);
+
   // Store pair data once
   await env.LINKS.put(
     `pair:${pairId}`,
     JSON.stringify(pairData),
-    { expirationTtl: 7 * 24 * 60 * 60 }
+    { expirationTtl: ttlSeconds }
   );
-  
+
   // Create indexes for both shortcodes
-  await env.LINKS.put(`link:${linkA}`, pairId, { expirationTtl: 7 * 24 * 60 * 60 });
-  await env.LINKS.put(`link:${linkB}`, pairId, { expirationTtl: 7 * 24 * 60 * 60 });
+  await env.LINKS.put(`link:${linkA}`, pairId, { expirationTtl: ttlSeconds });
+  await env.LINKS.put(`link:${linkB}`, pairId, { expirationTtl: ttlSeconds });
 }
 
 /**
@@ -116,13 +124,14 @@ export async function collapseState(env, shortcode, pairData) {
     accessLog
   };
   
-  // Store updated state
+  // Store updated state with original expiration time
+  const ttlSeconds = Math.floor(pairData.expiresIn / 1000);
   await env.LINKS.put(
     `pair:${pairId}`,
     JSON.stringify(updatedPair),
-    { expirationTtl: 7 * 24 * 60 * 60 }
+    { expirationTtl: ttlSeconds }
   );
-  
+
   return updatedPair;
 }
 

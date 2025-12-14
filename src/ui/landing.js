@@ -9,6 +9,7 @@ export function landingPage() {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Entangled Links - Quantum-Inspired URL Shortener</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -80,7 +81,7 @@ export function landingPage() {
       margin-bottom: 0.5em;
       font-weight: bold;
     }
-    input[type="url"] {
+    input[type="url"], input[type="text"], select {
       width: 100%;
       padding: 1em;
       border: none;
@@ -88,6 +89,12 @@ export function landingPage() {
       font-size: 1em;
       background: rgba(255,255,255,0.9);
       color: #333;
+    }
+    select {
+      cursor: pointer;
+    }
+    small {
+      font-size: 0.85em;
     }
     button {
       width: 100%;
@@ -158,6 +165,39 @@ export function landingPage() {
       background: rgba(255,107,107,0.1);
       border-radius: 8px;
     }
+    .qr-container {
+      display: flex;
+      justify-content: space-around;
+      margin: 2em 0;
+      flex-wrap: wrap;
+      gap: 1em;
+    }
+    .qr-box {
+      background: white;
+      padding: 1em;
+      border-radius: 10px;
+      text-align: center;
+      flex: 1;
+      min-width: 200px;
+    }
+    .qr-box h4 {
+      color: #333;
+      margin-bottom: 0.5em;
+      font-size: 1em;
+    }
+    .qr-code {
+      margin: 0 auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .download-btn {
+      width: 100%;
+      padding: 0.5em 1em;
+      font-size: 0.85em;
+      margin-top: 0.5em;
+      background: #667eea;
+    }
   </style>
 </head>
 <body>
@@ -180,12 +220,68 @@ export function landingPage() {
       <form id="generateForm">
         <div class="form-group">
           <label for="url">Destination URL</label>
-          <input 
-            type="url" 
-            id="url" 
-            placeholder="https://example.com" 
+          <input
+            type="url"
+            id="url"
+            placeholder="https://example.com"
             required
           >
+        </div>
+        <div class="form-group">
+          <label for="expiresIn">Link Expiration</label>
+          <select id="expiresIn">
+            <option value="30m">30 minutes</option>
+            <option value="1h">1 hour</option>
+            <option value="6h">6 hours</option>
+            <option value="1d">1 day</option>
+            <option value="7d" selected>7 days (default)</option>
+            <option value="14d">14 days</option>
+            <option value="30d">30 days</option>
+            <option value="custom">Custom...</option>
+          </select>
+        </div>
+        <div class="form-group" id="customExpirationGroup" style="display: none;">
+          <label for="customExpiration">Custom Expiration</label>
+          <input
+            type="text"
+            id="customExpiration"
+            placeholder="e.g., 2h, 3d, 1w"
+          >
+          <small style="display: block; margin-top: 0.5em; opacity: 0.7;">
+            Format: number + unit (m=minutes, h=hours, d=days, w=weeks)
+          </small>
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="useCustomShortcodes" style="width: auto; display: inline-block; margin-right: 0.5em;">
+            Use custom shortcodes
+          </label>
+        </div>
+        <div id="customShortcodesGroup" style="display: none;">
+          <div class="form-group">
+            <label for="customShortcodeA">Custom Shortcode A</label>
+            <input
+              type="text"
+              id="customShortcodeA"
+              placeholder="e.g., mylink1"
+              pattern="[a-zA-Z0-9]{3,20}"
+            >
+            <small style="display: block; margin-top: 0.5em; opacity: 0.7;">
+              3-20 alphanumeric characters
+            </small>
+          </div>
+          <div class="form-group">
+            <label for="customShortcodeB">Custom Shortcode B</label>
+            <input
+              type="text"
+              id="customShortcodeB"
+              placeholder="e.g., mylink2"
+              pattern="[a-zA-Z0-9]{3,20}"
+            >
+            <small style="display: block; margin-top: 0.5em; opacity: 0.7;">
+              3-20 alphanumeric characters
+            </small>
+          </div>
         </div>
         <button type="submit" id="submitBtn">
           Generate Entangled Links
@@ -194,6 +290,20 @@ export function landingPage() {
       
       <div id="result" class="result">
         <h3>✨ Entangled Pair Created</h3>
+
+        <div class="qr-container">
+          <div class="qr-box">
+            <h4>🔗 Link A QR Code</h4>
+            <div id="qrCodeA" class="qr-code"></div>
+            <button class="download-btn" onclick="downloadQR('qrCodeA', 'LinkA')">Download QR</button>
+          </div>
+          <div class="qr-box">
+            <h4>🔗 Link B QR Code</h4>
+            <div id="qrCodeB" class="qr-code"></div>
+            <button class="download-btn" onclick="downloadQR('qrCodeB', 'LinkB')">Download QR</button>
+          </div>
+        </div>
+
         <div class="link-box">
           <label>Link A</label>
           <a href="" id="linkA" target="_blank"></a>
@@ -207,10 +317,12 @@ export function landingPage() {
           <button class="copy-btn" onclick="copyLink('linkB')">Copy</button>
         </div>
         <div class="link-box">
-          <label>Status Pages</label>
-          <a href="" id="statusA" target="_blank">View Link A Status</a>
+          <label>Status & Analytics</label>
+          <a href="" id="statusA" target="_blank">📊 Link A Status</a> •
+          <a href="" id="analyticsA" target="_blank">Analytics</a>
           <br>
-          <a href="" id="statusB" target="_blank">View Link B Status</a>
+          <a href="" id="statusB" target="_blank">📊 Link B Status</a> •
+          <a href="" id="analyticsB" target="_blank">Analytics</a>
         </div>
         <p style="margin-top: 1em; opacity: 0.8; font-size: 0.9em;">
           Share these links with different parties. Both must be accessed to reveal the destination.
@@ -226,25 +338,94 @@ export function landingPage() {
     const submitBtn = document.getElementById('submitBtn');
     const result = document.getElementById('result');
     const error = document.getElementById('error');
-    
+    const expiresInSelect = document.getElementById('expiresIn');
+    const customExpirationGroup = document.getElementById('customExpirationGroup');
+    const useCustomShortcodes = document.getElementById('useCustomShortcodes');
+    const customShortcodesGroup = document.getElementById('customShortcodesGroup');
+
+    // Show/hide custom expiration input
+    expiresInSelect.addEventListener('change', () => {
+      if (expiresInSelect.value === 'custom') {
+        customExpirationGroup.style.display = 'block';
+      } else {
+        customExpirationGroup.style.display = 'none';
+      }
+    });
+
+    // Show/hide custom shortcodes input
+    useCustomShortcodes.addEventListener('change', () => {
+      if (useCustomShortcodes.checked) {
+        customShortcodesGroup.style.display = 'block';
+      } else {
+        customShortcodesGroup.style.display = 'none';
+      }
+    });
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       const url = document.getElementById('url').value;
-      
+
+      // Get expiration time
+      let expiresIn = expiresInSelect.value;
+      if (expiresIn === 'custom') {
+        expiresIn = document.getElementById('customExpiration').value;
+        if (!expiresIn) {
+          error.textContent = 'Please enter a custom expiration time';
+          error.style.display = 'block';
+          return;
+        }
+      }
+
+      // Get custom shortcodes if enabled
+      const requestBody = { url, expiresIn };
+      if (useCustomShortcodes.checked) {
+        const customShortcodeA = document.getElementById('customShortcodeA').value;
+        const customShortcodeB = document.getElementById('customShortcodeB').value;
+
+        if (!customShortcodeA || !customShortcodeB) {
+          error.textContent = 'Please enter both custom shortcodes';
+          error.style.display = 'block';
+          return;
+        }
+
+        // Validate format
+        const pattern = /^[a-zA-Z0-9]{3,20}$/;
+        if (!pattern.test(customShortcodeA)) {
+          error.textContent = 'Custom Shortcode A must be 3-20 alphanumeric characters';
+          error.style.display = 'block';
+          return;
+        }
+
+        if (!pattern.test(customShortcodeB)) {
+          error.textContent = 'Custom Shortcode B must be 3-20 alphanumeric characters';
+          error.style.display = 'block';
+          return;
+        }
+
+        if (customShortcodeA === customShortcodeB) {
+          error.textContent = 'Custom shortcodes must be different';
+          error.style.display = 'block';
+          return;
+        }
+
+        requestBody.customShortcodeA = customShortcodeA;
+        requestBody.customShortcodeB = customShortcodeB;
+      }
+
       // Disable form
       submitBtn.disabled = true;
       submitBtn.textContent = 'Generating...';
       result.classList.remove('show');
       error.style.display = 'none';
-      
+
       try {
         const response = await fetch('/generate', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ url })
+          body: JSON.stringify(requestBody)
         });
         
         const data = await response.json();
@@ -260,7 +441,37 @@ export function landingPage() {
         document.getElementById('linkB').textContent = data.pair.linkB;
         document.getElementById('statusA').href = data.pair.statusA;
         document.getElementById('statusB').href = data.pair.statusB;
-        
+
+        // Set analytics links
+        const shortcodeA = data.pair.linkA.split('/').pop();
+        const shortcodeB = data.pair.linkB.split('/').pop();
+        const baseUrl = new URL(data.pair.linkA).origin;
+        document.getElementById('analyticsA').href = `${baseUrl}/${shortcodeA}/analytics`;
+        document.getElementById('analyticsB').href = `${baseUrl}/${shortcodeB}/analytics`;
+
+        // Clear previous QR codes
+        document.getElementById('qrCodeA').innerHTML = '';
+        document.getElementById('qrCodeB').innerHTML = '';
+
+        // Generate QR codes
+        new QRCode(document.getElementById('qrCodeA'), {
+          text: data.pair.linkA,
+          width: 200,
+          height: 200,
+          colorDark: '#000000',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.H
+        });
+
+        new QRCode(document.getElementById('qrCodeB'), {
+          text: data.pair.linkB,
+          width: 200,
+          height: 200,
+          colorDark: '#000000',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.H
+        });
+
         result.classList.add('show');
         
       } catch (err) {
@@ -277,6 +488,17 @@ export function landingPage() {
       navigator.clipboard.writeText(link).then(() => {
         alert('Link copied to clipboard!');
       });
+    }
+
+    function downloadQR(qrElementId, linkName) {
+      const canvas = document.querySelector('#' + qrElementId + ' canvas');
+      if (canvas) {
+        const url = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = 'EntangledLink_' + linkName + '_QRCode.png';
+        link.href = url;
+        link.click();
+      }
     }
   </script>
 </body>
