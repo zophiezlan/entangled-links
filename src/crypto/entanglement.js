@@ -2,10 +2,14 @@
  * Cryptographic primitives for link entanglement
  */
 
+import { SHORTCODE_LENGTH } from '../config/constants.js';
+
 /**
  * Generate a random shortcode
+ * @param {number} length - Length of shortcode (default from constants)
+ * @returns {string} Random alphanumeric shortcode
  */
-export function generateShortcode(length = 8) {
+export function generateShortcode(length = SHORTCODE_LENGTH) {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const random = crypto.getRandomValues(new Uint8Array(length));
   return Array.from(random)
@@ -116,19 +120,20 @@ export async function decryptUrl(ciphertext, iv, masterKey) {
 }
 
 /**
- * Utility: ArrayBuffer to Base64
+ * Utility: ArrayBuffer to Base64 (optimized)
+ * @param {ArrayBuffer|Uint8Array} buffer - Buffer to encode
+ * @returns {string} Base64 encoded string
  */
 function arrayBufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
+  // Optimized: use apply instead of loop concatenation
+  return btoa(String.fromCharCode.apply(null, bytes));
 }
 
 /**
- * Utility: Base64 to ArrayBuffer
+ * Utility: Base64 to ArrayBuffer (optimized)
+ * @param {string} base64 - Base64 encoded string
+ * @returns {Uint8Array} Decoded byte array
  */
 function base64ToArrayBuffer(base64) {
   const binary = atob(base64);

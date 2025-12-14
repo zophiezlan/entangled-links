@@ -1,12 +1,14 @@
 /**
  * Entanglement state management
- * 
+ *
  * States:
  * - SUPERPOSITION: Neither link accessed
  * - COLLAPSED_A: Link A accessed first
  * - COLLAPSED_B: Link B accessed first
  * - OBSERVED: Both links accessed
  */
+
+import { DEFAULT_EXPIRATION_MS } from '../config/constants.js';
 
 export const EntanglementState = {
   SUPERPOSITION: 'SUPERPOSITION',
@@ -24,7 +26,7 @@ export const EntanglementState = {
  * @param {string} keyB - Key B
  * @param {number} expiresIn - Expiration time in milliseconds (default: 7 days)
  */
-export function createEntangledPair(shortcodeA, shortcodeB, encryptedData, keyA, keyB, expiresIn = 7 * 24 * 60 * 60 * 1000) {
+export function createEntangledPair(shortcodeA, shortcodeB, encryptedData, keyA, keyB, expiresIn = DEFAULT_EXPIRATION_MS) {
   const now = Date.now();
 
   return {
@@ -32,7 +34,6 @@ export function createEntangledPair(shortcodeA, shortcodeB, encryptedData, keyA,
     pairId: crypto.randomUUID(),
     createdAt: now,
     expiresAt: now + expiresIn,
-    expiresIn: expiresIn, // Store for later use
 
     // Entanglement state
     state: EntanglementState.SUPERPOSITION,
@@ -58,8 +59,10 @@ export function createEntangledPair(shortcodeA, shortcodeB, encryptedData, keyA,
  * Store entangled pair in KV
  */
 export async function storePair(env, pairData) {
-  const { linkA, linkB, pairId, expiresIn } = pairData;
-  const ttlSeconds = Math.floor(expiresIn / 1000);
+  const { linkA, linkB, pairId, expiresAt } = pairData;
+  const now = Date.now();
+  const remainingMs = expiresAt - now;
+  const ttlSeconds = Math.ceil(remainingMs / 1000);
 
   // Store pair data once
   await env.LINKS.put(
@@ -92,13 +95,13 @@ export async function getPairFromShortcode(env, shortcode) {
  * Update entanglement state when link is accessed
  */
 export async function collapseState(env, shortcode, pairData) {
-  const { linkA, linkB, state, pairId } = pairData;
+  const { linkA, linkB, state, pairId, expiresAt } = pairData;
   const isLinkA = shortcode === linkA;
   const now = Date.now();
-  
+
   // Determine new state
   let newState = state;
-  
+
   if (state === EntanglementState.SUPERPOSITION) {
     // First access - collapse
     newState = isLinkA ? EntanglementState.COLLAPSED_A : EntanglementState.COLLAPSED_B;
@@ -109,23 +112,25 @@ export async function collapseState(env, shortcode, pairData) {
     // Second link accessed - fully observed
     newState = EntanglementState.OBSERVED;
   }
-  
+
   // Update access log
   const accessLog = [...pairData.accessLog, {
     link: isLinkA ? 'A' : 'B',
     timestamp: now,
     newState: newState
   }];
-  
+
   // Update pair data
   const updatedPair = {
     ...pairData,
     state: newState,
     accessLog
   };
-  
-  // Store updated state with original expiration time
-  const ttlSeconds = Math.floor(pairData.expiresIn / 1000);
+
+  // Store updated state with remaining TTL (FIX: preserve remaining time, not original duration)
+  const remainingMs = expiresAt - now;
+  const ttlSeconds = Math.ceil(remainingMs / 1000);
+
   await env.LINKS.put(
     `pair:${pairId}`,
     JSON.stringify(updatedPair),

@@ -1,12 +1,20 @@
 /**
  * Generate entangled link pair
  * POST /generate
- * Body: { url: "https://example.com" }
+ * Body: { url: "https://example.com", expiresIn?: "7d"|number, customShortcodeA?: string, customShortcodeB?: string }
  */
 
 import { generateShortcode, generateMasterKey, splitKey, encryptUrl } from '../crypto/entanglement.js';
 import { createEntangledPair, storePair } from '../lib/state.js';
-import { sanitizeUrl } from '../middleware/security.js';
+import { validateUrl, validateShortcode } from '../lib/validation.js';
+import { createErrorResponse, createSuccessResponse, parseExpiration } from '../lib/utils.js';
+import {
+  DEFAULT_EXPIRATION_MS,
+  MIN_EXPIRATION_MS,
+  MAX_EXPIRATION_MS,
+  MAX_URL_LENGTH,
+  KV_PREFIX_LINK
+} from '../config/constants.js';
 
 export async function generatePair(request, env) {
   try {
@@ -15,232 +23,84 @@ export async function generatePair(request, env) {
     try {
       body = await request.json();
     } catch (error) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid JSON in request body' }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        }
+      return createErrorResponse(
+        'Invalid JSON',
+        'Request body must be valid JSON',
+        400
       );
     }
 
     const { url, expiresIn, customShortcodeA, customShortcodeB } = body;
 
-    // Validate URL exists
-    if (!url || typeof url !== 'string') {
-      return new Response(
-        JSON.stringify({
-          error: 'Missing or invalid URL',
-          message: 'Request body must contain a valid "url" field'
-        }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
+    // Validate URL
+    const urlValidation = validateUrl(url, MAX_URL_LENGTH);
+    if (!urlValidation.valid) {
+      return createErrorResponse('Invalid URL', urlValidation.error, 400);
     }
+    const sanitizedUrl = urlValidation.sanitized;
 
-    // Validate URL length
-    if (url.length > 2048) {
-      return new Response(
-        JSON.stringify({
-          error: 'URL too long',
-          message: 'URL must be less than 2048 characters'
-        }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
+    // Parse and validate expiration time
+    const expirationResult = parseExpiration(
+      expiresIn,
+      DEFAULT_EXPIRATION_MS,
+      MIN_EXPIRATION_MS,
+      MAX_EXPIRATION_MS
+    );
+    if (expirationResult.error) {
+      return createErrorResponse('Invalid expiration', expirationResult.error, 400);
     }
+    const expirationMs = expirationResult.expirationMs;
 
-    // Sanitize and validate URL
-    let sanitizedUrl;
-    try {
-      sanitizedUrl = sanitizeUrl(url);
-    } catch (error) {
-      return new Response(
-        JSON.stringify({
-          error: 'Invalid URL',
-          message: error.message
-        }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    // Validate and parse expiration time
-    let expirationMs = 7 * 24 * 60 * 60 * 1000; // Default: 7 days
-    if (expiresIn !== undefined) {
-      // expiresIn can be:
-      // - A number in milliseconds
-      // - A string like "1h", "2d", "30m", "1w"
-
-      if (typeof expiresIn === 'number') {
-        expirationMs = expiresIn;
-      } else if (typeof expiresIn === 'string') {
-        const match = expiresIn.match(/^(\d+)([mhdw])$/);
-        if (!match) {
-          return new Response(
-            JSON.stringify({
-              error: 'Invalid expiration format',
-              message: 'Use format like "30m", "2h", "7d", or "1w" (m=minutes, h=hours, d=days, w=weeks)'
-            }),
-            {
-              status: 400,
-              headers: { 'Content-Type': 'application/json' }
-            }
-          );
-        }
-
-        const value = parseInt(match[1]);
-        const unit = match[2];
-
-        const multipliers = {
-          m: 60 * 1000,              // minutes
-          h: 60 * 60 * 1000,         // hours
-          d: 24 * 60 * 60 * 1000,    // days
-          w: 7 * 24 * 60 * 60 * 1000 // weeks
-        };
-
-        expirationMs = value * multipliers[unit];
-      }
-
-      // Validate expiration time bounds
-      const minExpiration = 5 * 60 * 1000; // 5 minutes
-      const maxExpiration = 30 * 24 * 60 * 60 * 1000; // 30 days
-
-      if (expirationMs < minExpiration) {
-        return new Response(
-          JSON.stringify({
-            error: 'Expiration too short',
-            message: 'Minimum expiration time is 5 minutes'
-          }),
-          {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' }
-          }
-        );
-      }
-
-      if (expirationMs > maxExpiration) {
-        return new Response(
-          JSON.stringify({
-            error: 'Expiration too long',
-            message: 'Maximum expiration time is 30 days'
-          }),
-          {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' }
-          }
-        );
-      }
-    }
-
-    // Helper function to validate shortcode format
-    const validateShortcode = (code) => {
-      if (!code) return null;
-      // Must be alphanumeric, 3-20 characters
-      if (!/^[a-zA-Z0-9]{3,20}$/.test(code)) {
-        return 'Shortcode must be 3-20 alphanumeric characters';
-      }
-      // Reserved words check
-      const reserved = ['generate', 'status', 'analytics', 'api', 'admin'];
-      if (reserved.includes(code.toLowerCase())) {
-        return 'This shortcode is reserved';
-      }
-      return null;
-    };
-
-    // Validate custom shortcodes if provided
+    // Handle custom shortcodes
     let shortcodeA, shortcodeB;
 
     if (customShortcodeA || customShortcodeB) {
-      // Both must be provided if using custom shortcodes
+      // Both must be provided
       if (!customShortcodeA || !customShortcodeB) {
-        return new Response(
-          JSON.stringify({
-            error: 'Incomplete custom shortcodes',
-            message: 'Both customShortcodeA and customShortcodeB must be provided together'
-          }),
-          {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' }
-          }
+        return createErrorResponse(
+          'Incomplete custom shortcodes',
+          'Both customShortcodeA and customShortcodeB must be provided together',
+          400
         );
       }
 
-      // Validate format
-      const errorA = validateShortcode(customShortcodeA);
-      if (errorA) {
-        return new Response(
-          JSON.stringify({
-            error: 'Invalid customShortcodeA',
-            message: errorA
-          }),
-          {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' }
-          }
-        );
+      // Validate shortcode A
+      const validationA = validateShortcode(customShortcodeA);
+      if (!validationA.valid) {
+        return createErrorResponse('Invalid customShortcodeA', validationA.error, 400);
       }
 
-      const errorB = validateShortcode(customShortcodeB);
-      if (errorB) {
-        return new Response(
-          JSON.stringify({
-            error: 'Invalid customShortcodeB',
-            message: errorB
-          }),
-          {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' }
-          }
-        );
+      // Validate shortcode B
+      const validationB = validateShortcode(customShortcodeB);
+      if (!validationB.valid) {
+        return createErrorResponse('Invalid customShortcodeB', validationB.error, 400);
       }
 
       // Must be different
       if (customShortcodeA === customShortcodeB) {
-        return new Response(
-          JSON.stringify({
-            error: 'Duplicate shortcodes',
-            message: 'customShortcodeA and customShortcodeB must be different'
-          }),
-          {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' }
-          }
+        return createErrorResponse(
+          'Duplicate shortcodes',
+          'customShortcodeA and customShortcodeB must be different',
+          400
         );
       }
 
       // Check availability
-      const existingA = await env.LINKS.get(`link:${customShortcodeA}`);
+      const existingA = await env.LINKS.get(`${KV_PREFIX_LINK}${customShortcodeA}`);
       if (existingA) {
-        return new Response(
-          JSON.stringify({
-            error: 'Shortcode unavailable',
-            message: `Shortcode "${customShortcodeA}" is already in use`
-          }),
-          {
-            status: 409,
-            headers: { 'Content-Type': 'application/json' }
-          }
+        return createErrorResponse(
+          'Shortcode unavailable',
+          `Shortcode "${customShortcodeA}" is already in use`,
+          409
         );
       }
 
-      const existingB = await env.LINKS.get(`link:${customShortcodeB}`);
+      const existingB = await env.LINKS.get(`${KV_PREFIX_LINK}${customShortcodeB}`);
       if (existingB) {
-        return new Response(
-          JSON.stringify({
-            error: 'Shortcode unavailable',
-            message: `Shortcode "${customShortcodeB}" is already in use`
-          }),
-          {
-            status: 409,
-            headers: { 'Content-Type': 'application/json' }
-          }
+        return createErrorResponse(
+          'Shortcode unavailable',
+          `Shortcode "${customShortcodeB}" is already in use`,
+          409
         );
       }
 
@@ -248,8 +108,8 @@ export async function generatePair(request, env) {
       shortcodeB = customShortcodeB;
     } else {
       // Generate random shortcodes
-      shortcodeA = generateShortcode(8);
-      shortcodeB = generateShortcode(8);
+      shortcodeA = generateShortcode();
+      shortcodeB = generateShortcode();
     }
 
     // Generate and split encryption key
@@ -284,38 +144,25 @@ export async function generatePair(request, env) {
     });
 
     // Return the entangled pair
-    return new Response(
-      JSON.stringify({
-        success: true,
-        pair: {
-          id: pairData.pairId,
-          linkA: `${baseUrl}/${shortcodeA}`,
-          linkB: `${baseUrl}/${shortcodeB}`,
-          statusA: `${baseUrl}/${shortcodeA}/status`,
-          statusB: `${baseUrl}/${shortcodeB}/status`,
-          state: pairData.state,
-          expiresAt: pairData.expiresAt
-        }
-      }),
-      {
-        status: 201,
-        headers: {
-          'Content-Type': 'application/json'
-        }
+    return createSuccessResponse({
+      success: true,
+      pair: {
+        id: pairData.pairId,
+        linkA: `${baseUrl}/${shortcodeA}`,
+        linkB: `${baseUrl}/${shortcodeB}`,
+        statusA: `${baseUrl}/${shortcodeA}/status`,
+        statusB: `${baseUrl}/${shortcodeB}/status`,
+        state: pairData.state,
+        expiresAt: pairData.expiresAt
       }
-    );
+    }, 201);
 
   } catch (error) {
     console.error('Generate pair error:', error);
-    return new Response(
-      JSON.stringify({
-        error: 'Failed to generate entangled pair',
-        message: 'An unexpected error occurred during pair generation'
-      }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      }
+    return createErrorResponse(
+      'Failed to generate entangled pair',
+      'An unexpected error occurred during pair generation',
+      500
     );
   }
 }
