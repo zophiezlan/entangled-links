@@ -20,8 +20,8 @@
   "license": "MIT",
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241127.0",
-    "vitest": "^1.0.0",
-    "wrangler": "^3.80.0"
+    "vitest": "^4.0.15",
+    "wrangler": "^4.54.0"
   },
   "dependencies": {
     "qrcode": "^1.5.4"
