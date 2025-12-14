@@ -2,16 +2,18 @@
  * Entangled Links - Main Worker Entry Point
  *
  * Routes:
- * - GET  /                    -> Landing page
- * - POST /generate            -> Create entangled pair
- * - GET  /:shortcode          -> Resolve and redirect
- * - GET  /:shortcode/status   -> View entanglement state
+ * - GET  /                       -> Landing page
+ * - POST /generate               -> Create entangled pair
+ * - GET  /:shortcode             -> Resolve and redirect
+ * - GET  /:shortcode/status      -> View entanglement state
+ * - GET  /:shortcode/analytics   -> View link analytics
  */
 
 import { Router } from './lib/router.js';
 import { generatePair } from './routes/generate.js';
 import { resolveLink } from './routes/resolve.js';
 import { viewStatus } from './routes/status.js';
+import { viewAnalytics } from './routes/analytics.js';
 import { landingPage } from './ui/landing.js';
 import { createRateLimiter } from './middleware/rateLimiter.js';
 import { createSecurityMiddleware, handleCORSPreflight } from './middleware/security.js';
@@ -53,6 +55,11 @@ export default {
       // View status (no rate limiting for better UX)
       router.get('/:shortcode/status', (req, params) =>
         viewStatus(params.shortcode, env)
+      );
+
+      // View analytics (no rate limiting for better UX)
+      router.get('/:shortcode/analytics', (req, params) =>
+        viewAnalytics(params.shortcode, env)
       );
 
       // Resolve link (must be last - catch-all, no rate limiting)

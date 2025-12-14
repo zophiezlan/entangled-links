@@ -31,9 +31,27 @@ Creates a new entangled link pair for the provided URL.
 **Request Body**:
 ```json
 {
-  "url": "https://example.com/destination"
+  "url": "https://example.com/destination",
+  "expiresIn": "7d",  // Optional: "30m", "1h", "2d", "1w", or milliseconds
+  "customShortcodeA": "mylink1",  // Optional: 3-20 alphanumeric characters
+  "customShortcodeB": "mylink2"   // Optional: 3-20 alphanumeric characters
 }
 ```
+
+**Optional Parameters**:
+- `expiresIn` (string|number): Expiration time
+  - String format: `"30m"`, `"1h"`, `"2d"`, `"1w"` (m=minutes, h=hours, d=days, w=weeks)
+  - Number format: milliseconds
+  - Default: 7 days
+  - Min: 5 minutes, Max: 30 days
+- `customShortcodeA` (string): Custom shortcode for Link A
+  - Must be 3-20 alphanumeric characters
+  - Cannot be reserved words (generate, status, analytics, api, admin)
+  - Must be unique (not already in use)
+- `customShortcodeB` (string): Custom shortcode for Link B
+  - Same requirements as customShortcodeA
+  - Must be different from customShortcodeA
+  - Both customShortcodeA and customShortcodeB must be provided together
 
 **Request Headers**:
 - `Content-Type: application/json`
@@ -163,11 +181,51 @@ Returns an HTML page displaying:
 - Auto-refreshes every 5 seconds
 - Shows real-time state changes
 - Privacy-respecting (no tracking)
+- QR code generation for easy mobile sharing
+- Downloadable QR codes
 
 **Example**:
 
 ```bash
 curl https://your-worker.workers.dev/abc12345/status
+```
+
+### 5. View Analytics
+
+**GET /:shortcode/analytics**
+
+Returns a detailed analytics dashboard for the entangled link pair.
+
+**Parameters**:
+- `shortcode` (path): The unique identifier for the link
+
+**Response**:
+
+Returns an HTML page displaying:
+- Total access count for both links
+- Individual access counts for Link A and Link B
+- Access distribution chart (pie chart)
+- Current entanglement state
+- Time remaining until expiration
+- Progress bar showing lifetime percentage
+- Pair metadata (ID, creation date, expiration date)
+- Complete access timeline with state transitions
+
+**Status Codes**:
+- `200 OK`: Analytics page returned
+- `404 Not Found`: Link does not exist
+
+**Features**:
+- Interactive charts using Chart.js
+- Visual state indicators
+- Access distribution visualization
+- Timeline of all access events
+- Real-time metrics
+
+**Example**:
+
+```bash
+curl https://your-worker.workers.dev/abc12345/analytics
 ```
 
 ## Entanglement States

@@ -25,6 +25,7 @@ export async function viewStatus(shortcode, env) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Entanglement Status</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -109,6 +110,43 @@ export async function viewStatus(shortcode, env) {
       background: rgba(255,255,255,0.3);
       transform: translateY(-2px);
     }
+    .qr-section {
+      margin-top: 2em;
+    }
+    .qr-box {
+      background: white;
+      padding: 1.5em;
+      border-radius: 10px;
+      text-align: center;
+      margin: 1em auto;
+      max-width: 300px;
+    }
+    .qr-box h4 {
+      color: #333;
+      margin-bottom: 1em;
+      font-size: 1.1em;
+    }
+    .qr-code {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 1em 0;
+    }
+    .download-btn {
+      padding: 0.75em 1.5em;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9em;
+      font-weight: bold;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .download-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
   </style>
 </head>
 <body>
@@ -150,7 +188,16 @@ export async function viewStatus(shortcode, env) {
         <div class="value">${new Date(pairData.expiresAt).toLocaleString()}</div>
       </div>
     </div>
-    
+
+    <div class="status-card qr-section">
+      <h3>📱 QR Code</h3>
+      <div class="qr-box">
+        <h4>Scan to Access This Link</h4>
+        <div id="qrCode" class="qr-code"></div>
+        <button class="download-btn" onclick="downloadQR()">Download QR Code</button>
+      </div>
+    </div>
+
     ${pairData.accessLog.length > 0 ? `
     <div class="status-card timeline">
       <h3>Access History</h3>
@@ -168,10 +215,33 @@ export async function viewStatus(shortcode, env) {
     
     <div style="text-align: center;">
       <a href="/${shortcode}" class="back-link">← Back to Link</a>
+      <a href="/${shortcode}/analytics" class="back-link" style="margin-left: 1em;">📊 View Analytics</a>
     </div>
   </div>
   
   <script>
+    // Generate QR code on page load
+    const currentUrl = window.location.href.replace('/status', '');
+    new QRCode(document.getElementById('qrCode'), {
+      text: currentUrl,
+      width: 200,
+      height: 200,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H
+    });
+
+    function downloadQR() {
+      const canvas = document.querySelector('#qrCode canvas');
+      if (canvas) {
+        const url = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = 'EntangledLink_QRCode.png';
+        link.href = url;
+        link.click();
+      }
+    }
+
     // Auto-refresh every 5 seconds to show state changes
     setTimeout(() => location.reload(), 5000);
   </script>

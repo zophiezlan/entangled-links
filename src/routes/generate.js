@@ -24,7 +24,7 @@ export async function generatePair(request, env) {
       );
     }
 
-    const { url } = body;
+    const { url, expiresIn, customShortcodeA, customShortcodeB } = body;
 
     // Validate URL exists
     if (!url || typeof url !== 'string') {
@@ -71,9 +71,186 @@ export async function generatePair(request, env) {
       );
     }
 
-    // Generate unique shortcodes
-    const shortcodeA = generateShortcode(8);
-    const shortcodeB = generateShortcode(8);
+    // Validate and parse expiration time
+    let expirationMs = 7 * 24 * 60 * 60 * 1000; // Default: 7 days
+    if (expiresIn !== undefined) {
+      // expiresIn can be:
+      // - A number in milliseconds
+      // - A string like "1h", "2d", "30m", "1w"
+
+      if (typeof expiresIn === 'number') {
+        expirationMs = expiresIn;
+      } else if (typeof expiresIn === 'string') {
+        const match = expiresIn.match(/^(\d+)([mhdw])$/);
+        if (!match) {
+          return new Response(
+            JSON.stringify({
+              error: 'Invalid expiration format',
+              message: 'Use format like "30m", "2h", "7d", or "1w" (m=minutes, h=hours, d=days, w=weeks)'
+            }),
+            {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' }
+            }
+          );
+        }
+
+        const value = parseInt(match[1]);
+        const unit = match[2];
+
+        const multipliers = {
+          m: 60 * 1000,              // minutes
+          h: 60 * 60 * 1000,         // hours
+          d: 24 * 60 * 60 * 1000,    // days
+          w: 7 * 24 * 60 * 60 * 1000 // weeks
+        };
+
+        expirationMs = value * multipliers[unit];
+      }
+
+      // Validate expiration time bounds
+      const minExpiration = 5 * 60 * 1000; // 5 minutes
+      const maxExpiration = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+      if (expirationMs < minExpiration) {
+        return new Response(
+          JSON.stringify({
+            error: 'Expiration too short',
+            message: 'Minimum expiration time is 5 minutes'
+          }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      if (expirationMs > maxExpiration) {
+        return new Response(
+          JSON.stringify({
+            error: 'Expiration too long',
+            message: 'Maximum expiration time is 30 days'
+          }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+    }
+
+    // Helper function to validate shortcode format
+    const validateShortcode = (code) => {
+      if (!code) return null;
+      // Must be alphanumeric, 3-20 characters
+      if (!/^[a-zA-Z0-9]{3,20}$/.test(code)) {
+        return 'Shortcode must be 3-20 alphanumeric characters';
+      }
+      // Reserved words check
+      const reserved = ['generate', 'status', 'analytics', 'api', 'admin'];
+      if (reserved.includes(code.toLowerCase())) {
+        return 'This shortcode is reserved';
+      }
+      return null;
+    };
+
+    // Validate custom shortcodes if provided
+    let shortcodeA, shortcodeB;
+
+    if (customShortcodeA || customShortcodeB) {
+      // Both must be provided if using custom shortcodes
+      if (!customShortcodeA || !customShortcodeB) {
+        return new Response(
+          JSON.stringify({
+            error: 'Incomplete custom shortcodes',
+            message: 'Both customShortcodeA and customShortcodeB must be provided together'
+          }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      // Validate format
+      const errorA = validateShortcode(customShortcodeA);
+      if (errorA) {
+        return new Response(
+          JSON.stringify({
+            error: 'Invalid customShortcodeA',
+            message: errorA
+          }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      const errorB = validateShortcode(customShortcodeB);
+      if (errorB) {
+        return new Response(
+          JSON.stringify({
+            error: 'Invalid customShortcodeB',
+            message: errorB
+          }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      // Must be different
+      if (customShortcodeA === customShortcodeB) {
+        return new Response(
+          JSON.stringify({
+            error: 'Duplicate shortcodes',
+            message: 'customShortcodeA and customShortcodeB must be different'
+          }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      // Check availability
+      const existingA = await env.LINKS.get(`link:${customShortcodeA}`);
+      if (existingA) {
+        return new Response(
+          JSON.stringify({
+            error: 'Shortcode unavailable',
+            message: `Shortcode "${customShortcodeA}" is already in use`
+          }),
+          {
+            status: 409,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      const existingB = await env.LINKS.get(`link:${customShortcodeB}`);
+      if (existingB) {
+        return new Response(
+          JSON.stringify({
+            error: 'Shortcode unavailable',
+            message: `Shortcode "${customShortcodeB}" is already in use`
+          }),
+          {
+            status: 409,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      shortcodeA = customShortcodeA;
+      shortcodeB = customShortcodeB;
+    } else {
+      // Generate random shortcodes
+      shortcodeA = generateShortcode(8);
+      shortcodeB = generateShortcode(8);
+    }
 
     // Generate and split encryption key
     const masterKey = await generateMasterKey();
@@ -88,7 +265,8 @@ export async function generatePair(request, env) {
       shortcodeB,
       encryptedData,
       keyA,
-      keyB
+      keyB,
+      expirationMs
     );
 
     // Store in KV
