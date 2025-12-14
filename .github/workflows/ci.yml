@@ -75,9 +75,8 @@ jobs:
       - name: Inject KV namespace IDs
         run: node scripts/inject-kv-placeholders.js
         env:
-          KV_NAMESPACE_ID_DEV: ${{ secrets.KV_NAMESPACE_ID_DEV }}
           KV_NAMESPACE_ID_STAGING: ${{ secrets.KV_NAMESPACE_ID_STAGING }}
-          KV_NAMESPACE_ID_PROD: ${{ secrets.KV_NAMESPACE_ID_PROD }}
+          TARGET_ENV: staging
 
       - name: Deploy to Cloudflare Workers (Staging)
         uses: cloudflare/wrangler-action@v3
@@ -111,9 +110,8 @@ jobs:
       - name: Inject KV namespace IDs
         run: node scripts/inject-kv-placeholders.js
         env:
-          KV_NAMESPACE_ID_DEV: ${{ secrets.KV_NAMESPACE_ID_DEV }}
-          KV_NAMESPACE_ID_STAGING: ${{ secrets.KV_NAMESPACE_ID_STAGING }}
           KV_NAMESPACE_ID_PROD: ${{ secrets.KV_NAMESPACE_ID_PROD }}
+          TARGET_ENV: production
 
       - name: Deploy to Cloudflare Workers (Production)
         uses: cloudflare/wrangler-action@v3
