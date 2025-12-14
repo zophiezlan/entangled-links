@@ -446,8 +446,8 @@ export function landingPage() {
         const shortcodeA = data.pair.linkA.split('/').pop();
         const shortcodeB = data.pair.linkB.split('/').pop();
         const baseUrl = new URL(data.pair.linkA).origin;
-        document.getElementById('analyticsA').href = `${baseUrl}/${shortcodeA}/analytics`;
-        document.getElementById('analyticsB').href = `${baseUrl}/${shortcodeB}/analytics`;
+        document.getElementById('analyticsA').href = baseUrl + '/' + shortcodeA + '/analytics';
+        document.getElementById('analyticsB').href = baseUrl + '/' + shortcodeB + '/analytics';
 
         // Clear previous QR codes
         document.getElementById('qrCodeA').innerHTML = '';
