@@ -10,41 +10,41 @@ export async function resolveLink(shortcode, env, ctx) {
   try {
     // Get pair data
     const pairData = await getPairFromShortcode(env, shortcode);
-    
+
     if (!pairData) {
-      return new Response('Link not found', { 
+      return new Response('Link not found', {
         status: 404,
         headers: { 'Content-Type': 'text/plain' }
       });
     }
-    
+
     // Check expiration
     if (Date.now() > pairData.expiresAt) {
-      return new Response('Link expired', { 
+      return new Response('Link expired', {
         status: 410,
         headers: { 'Content-Type': 'text/plain' }
       });
     }
-    
+
     // Update entanglement state (async, don't wait)
     ctx.waitUntil(collapseState(env, shortcode, pairData));
-    
+
     // Check if we can decrypt (both links accessed)
     if (!canDecrypt(pairData)) {
       // State not yet observed - show waiting page
       return waitingPage(shortcode, pairData);
     }
-    
+
     // Both links accessed - decrypt and redirect
     const { keyA, keyB, encryptedUrl, iv } = pairData;
     const masterKey = await reconstructKey(keyA, keyB);
     const url = await decryptUrl(encryptedUrl, iv, masterKey);
-    
+
     return Response.redirect(url, 302);
-    
+
   } catch (error) {
     console.error('Resolve error:', error);
-    return new Response('Internal error', { 
+    return new Response('Internal error', {
       status: 500,
       headers: { 'Content-Type': 'text/plain' }
     });
@@ -54,7 +54,7 @@ export async function resolveLink(shortcode, env, ctx) {
 function waitingPage(shortcode, pairData) {
   const isLinkA = shortcode === pairData.linkA;
   const twinCode = isLinkA ? pairData.linkB : pairData.linkA;
-  
+
   const html = `<!DOCTYPE html>
 <html>
 <head>

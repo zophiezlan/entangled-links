@@ -83,11 +83,11 @@ export async function getPairFromShortcode(env, shortcode) {
   // Get pair ID from shortcode index
   const pairId = await env.LINKS.get(`link:${shortcode}`);
   if (!pairId) return null;
-  
+
   // Get pair data
   const pairJson = await env.LINKS.get(`pair:${pairId}`);
   if (!pairJson) return null;
-  
+
   return JSON.parse(pairJson);
 }
 

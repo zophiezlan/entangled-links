@@ -8,17 +8,17 @@ import { getPairFromShortcode } from '../lib/state.js';
 export async function viewStatus(shortcode, env) {
   try {
     const pairData = await getPairFromShortcode(env, shortcode);
-    
+
     if (!pairData) {
-      return new Response('Link not found', { 
+      return new Response('Link not found', {
         status: 404,
         headers: { 'Content-Type': 'text/plain' }
       });
     }
-    
+
     const isLinkA = shortcode === pairData.linkA;
     const twinCode = isLinkA ? pairData.linkB : pairData.linkA;
-    
+
     const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -252,10 +252,10 @@ export async function viewStatus(shortcode, env) {
       status: 200,
       headers: { 'Content-Type': 'text/html' }
     });
-    
+
   } catch (error) {
     console.error('Status view error:', error);
-    return new Response('Internal error', { 
+    return new Response('Internal error', {
       status: 500,
       headers: { 'Content-Type': 'text/plain' }
     });

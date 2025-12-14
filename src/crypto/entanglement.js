@@ -38,16 +38,16 @@ export async function generateMasterKey() {
 export async function splitKey(masterKey) {
   const exported = await crypto.subtle.exportKey('raw', masterKey);
   const masterBytes = new Uint8Array(exported);
-  
+
   // Generate random Key A
   const keyA = crypto.getRandomValues(new Uint8Array(masterBytes.length));
-  
+
   // Key B is XOR of master and Key A
   const keyB = new Uint8Array(masterBytes.length);
   for (let i = 0; i < masterBytes.length; i++) {
     keyB[i] = masterBytes[i] ^ keyA[i];
   }
-  
+
   return {
     keyA: arrayBufferToBase64(keyA),
     keyB: arrayBufferToBase64(keyB)
@@ -60,13 +60,13 @@ export async function splitKey(masterKey) {
 export async function reconstructKey(keyABase64, keyBBase64) {
   const keyA = base64ToArrayBuffer(keyABase64);
   const keyB = base64ToArrayBuffer(keyBBase64);
-  
+
   // XOR to get master key
   const masterBytes = new Uint8Array(keyA.length);
   for (let i = 0; i < keyA.length; i++) {
     masterBytes[i] = keyA[i] ^ keyB[i];
   }
-  
+
   return await crypto.subtle.importKey(
     'raw',
     masterBytes,
@@ -83,7 +83,7 @@ export async function encryptUrl(url, masterKey) {
   const encoder = new TextEncoder();
   const data = encoder.encode(url);
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  
+
   const encrypted = await crypto.subtle.encrypt(
     {
       name: 'AES-GCM',
@@ -92,7 +92,7 @@ export async function encryptUrl(url, masterKey) {
     masterKey,
     data
   );
-  
+
   return {
     ciphertext: arrayBufferToBase64(encrypted),
     iv: arrayBufferToBase64(iv)
@@ -105,7 +105,7 @@ export async function encryptUrl(url, masterKey) {
 export async function decryptUrl(ciphertext, iv, masterKey) {
   const encrypted = base64ToArrayBuffer(ciphertext);
   const ivArray = base64ToArrayBuffer(iv);
-  
+
   const decrypted = await crypto.subtle.decrypt(
     {
       name: 'AES-GCM',
@@ -114,7 +114,7 @@ export async function decryptUrl(ciphertext, iv, masterKey) {
     masterKey,
     encrypted
   );
-  
+
   const decoder = new TextDecoder();
   return decoder.decode(decrypted);
 }
