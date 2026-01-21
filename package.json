@@ -24,7 +24,7 @@
     "@cloudflare/workers-types": "^4.20241127.0",
     "eslint": "^9.39.2",
     "vitest": "^4.0.15",
-    "wrangler": "^4.54.0"
+    "wrangler": "^4.59.1"
   },
   "dependencies": {
     "qrcode": "^1.5.4"
